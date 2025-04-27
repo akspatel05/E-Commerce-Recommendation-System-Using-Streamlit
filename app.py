@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from scipy.sparse import csr_matrix
 from sklearn.metrics.pairwise import cosine_similarity
+from annoy import AnnoyIndex
 
 # --- Streamlit Page Config ---
 st.set_page_config(page_title="Ecommerce Product Recommender", layout="wide")
@@ -47,7 +49,7 @@ if ratings_file is not None:
     st.dataframe(df.head(10), use_container_width=True)
 
     recommender_type = st.sidebar.radio('Recommendation Method:',
-                        ['🏆 Rank-Based', '👥 User-Based CF', '🧠 Model-Based CF (SVD Approximation)'])
+                        ['🏆 Rank-Based', '👥 User-Based CF', '🧠 Model-Based CF (SVD Approximation)', '🔍 ANN-Based'])
 
     # --- Helper Functions ---
     def get_top_products(df, n=10):
@@ -61,17 +63,12 @@ if ratings_file is not None:
         sparse_matrix = csr_matrix(pivot.values)
 
         # Perform SVD using TruncatedSVD for efficiency
+        from sklearn.decomposition import TruncatedSVD
         svd = TruncatedSVD(n_components=50, random_state=42)
         svd_pred = svd.fit_transform(sparse_matrix)
 
         # Reconstruct the full prediction matrix
         svd_df = pd.DataFrame(np.dot(svd_pred, svd.components_), index=pivot.index, columns=pivot.columns)
-        # U, sigma, Vt = np.linalg.svd(pivot.values, full_matrices=False)
-
-        # sigma_diag_matrix = np.diag(sigma)
-        # svd_pred = np.dot(np.dot(U, sigma_diag_matrix), Vt)
-
-        # svd_df = pd.DataFrame(svd_pred, index=pivot.index, columns=pivot.columns)
 
         if user_id not in svd_df.index:
             return []
@@ -97,6 +94,35 @@ if ratings_file is not None:
             st.markdown(f"**🛍️ {row['Product_Name']}**")
         else:
             st.markdown(f"🛒 **Unknown Product**\n\nProduct ID: {product_id}")
+
+    # --- ANN-Specific Helper Functions ---
+    def create_ann_index(df, n_trees=10):
+        """Create an ANN index for faster product recommendations."""
+        user_product_matrix = df.pivot_table(index='User_ID', columns='Product_ID', values='Rating').fillna(0)
+        user_product_matrix_sparse = csr_matrix(user_product_matrix.values)
+        
+        # Initialize the Annoy index
+        annoy_index = AnnoyIndex(user_product_matrix_sparse.shape[1], 'angular')  # Using angular distance
+        
+        # Add items to the index
+        for i in range(user_product_matrix_sparse.shape[0]):
+            annoy_index.add_item(i, user_product_matrix_sparse[i].toarray()[0])
+
+        annoy_index.build(n_trees)
+        return annoy_index, user_product_matrix.index, user_product_matrix
+
+    def get_ann_recommendations(user_id, annoy_index, user_index, top_n=5):
+        """Get recommendations using ANN (Nearest Neighbors)."""
+        user_idx = user_index.get_loc(user_id)
+        neighbors = annoy_index.get_nns_by_item(user_idx, top_n, include_distances=False)
+        
+        recommended_products = set()
+        
+        # Retrieve the product IDs for the recommended users
+        for idx in neighbors:
+            recommended_products.update(user_product_matrix.iloc[idx].index[user_product_matrix.iloc[idx] > 0])
+        
+        return list(recommended_products)
 
     # --- Main Recommendation Logic ---
     if recommender_type == '🏆 Rank-Based':
@@ -158,28 +184,6 @@ if ratings_file is not None:
                     st.error('⚠️ Selected user not found in the ratings matrix.')
         else:
             st.warning("⚠️ No valid users found with ratings. Please check your dataset.")
-        
-
-        # if user_id:
-        #     if user_id in df['User_ID'].values:
-        #         user_product_matrix = df.pivot_table(index='User_ID', columns='Product_ID', values='Rating')
-        #         user_similarity = user_product_matrix.corrwith(user_product_matrix.loc[user_id]).dropna()
-        #         similar_users = user_similarity.sort_values(ascending=False).index.tolist()
-
-        #         recommended_products = []
-        #         for similar_user in similar_users:
-        #             products = df[df['User_ID'] == similar_user]['Product_ID'].tolist()
-        #             recommended_products.extend(products)
-        #             if len(recommended_products) > 5:
-        #                 break
-
-        #         recommended_products = list(set(recommended_products))
-
-        #         st.success('🎯 Top Recommendations for You:')
-        #         for prod in recommended_products[:5]:
-        #             display_product(prod)
-        #     else:
-        #         st.error('⚠️ User ID not found!')
 
     elif recommender_type == '🧠 Model-Based CF (SVD Approximation)':
         st.header('🧠 Model-Based Collaborative Filtering (SVD Approximation)')
@@ -199,6 +203,26 @@ if ratings_file is not None:
 
             except Exception as e:
                 st.error(f"❌ An error occurred: {e}")
+
+    elif recommender_type == '🔍 ANN-Based':
+        st.header('🔍 Approximate Nearest Neighbor (ANN) Recommendation')
+
+        # Create the ANN index for faster recommendations
+        with st.spinner('Building ANN index...'):
+            annoy_index, user_index, user_product_matrix = create_ann_index(df)
+
+        # Get recommendations
+        user_id = st.text_input('Enter User ID for ANN Recommendations:')
+        if user_id:
+            with st.spinner('Finding recommendations...'):
+                recommended_products = get_ann_recommendations(user_id, annoy_index, user_index)
+                
+                if recommended_products:
+                    st.success('🎯 Top Recommendations for You:')
+                    for prod in recommended_products[:5]:
+                        display_product(prod)
+                else:
+                    st.warning("⚠️ No recommendations found for this User ID.", icon="⚠️")
 
 else:
     st.warning('🚀 Please upload a ratings CSV to start!')
