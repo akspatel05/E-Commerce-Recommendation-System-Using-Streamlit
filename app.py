@@ -31,6 +31,10 @@ uploaded_file = st.sidebar.file_uploader("Upload Ratings CSV", type=["csv"])
 
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
+    
+    # Sample only 5% of data to work safely
+    df = df.sample(frac=0.05, random_state=42)  # adjust the fraction if needed
+    st.success(f"Using {len(df)} rows after sampling.")
 
     st.subheader('📊 Dataset Preview')
     st.dataframe(df.head(10), use_container_width=True)
