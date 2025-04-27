@@ -102,28 +102,54 @@ if ratings_file is not None:
     elif recommender_type == 'User-Based CF':
         st.header('👥 User-Based Collaborative Filtering')
 
-        user_id = st.text_input('Enter User ID for recommendations:')
+        # user_id = st.text_input('Enter User ID for recommendations:')
+
+        active_users = df.groupby('User_ID').size()
+        valid_user_ids = active_users[active_users > 0].index.tolist()
+
+        # Allow the user to select from valid User IDs
+        user_id = st.selectbox('Select User ID for recommendations:', valid_user_ids)
 
         if user_id:
-            if user_id in df['User_ID'].values:
-                user_product_matrix = df.pivot_table(index='User_ID', columns='Product_ID', values='Rating')
-                user_similarity = user_product_matrix.corrwith(user_product_matrix.loc[user_id]).dropna()
-                similar_users = user_similarity.sort_values(ascending=False).index.tolist()
+            user_product_matrix = df.pivot_table(index='User_ID', columns='Product_ID', values='Rating')
+            user_similarity = user_product_matrix.corrwith(user_product_matrix.loc[user_id]).dropna()
+            similar_users = user_similarity.sort_values(ascending=False).index.tolist()
 
-                recommended_products = []
-                for similar_user in similar_users:
-                    products = df[df['User_ID'] == similar_user]['Product_ID'].tolist()
-                    recommended_products.extend(products)
-                    if len(recommended_products) > 5:
-                        break
+            recommended_products = []
+            for similar_user in similar_users:
+                products = df[df['User_ID'] == similar_user]['Product_ID'].tolist()
+                recommended_products.extend(products)
+                if len(recommended_products) > 5:
+                    break
 
-                recommended_products = list(set(recommended_products))
+            recommended_products = list(set(recommended_products))
 
-                st.success('🎯 Top Recommendations for You:')
-                for prod in recommended_products[:5]:
-                    display_product(prod)
-            else:
-                st.error('⚠️ User ID not found!')
+            st.success('🎯 Top Recommendations for You:')
+            for prod in recommended_products[:5]:
+                display_product(prod)
+
+        
+
+        # if user_id:
+        #     if user_id in df['User_ID'].values:
+        #         user_product_matrix = df.pivot_table(index='User_ID', columns='Product_ID', values='Rating')
+        #         user_similarity = user_product_matrix.corrwith(user_product_matrix.loc[user_id]).dropna()
+        #         similar_users = user_similarity.sort_values(ascending=False).index.tolist()
+
+        #         recommended_products = []
+        #         for similar_user in similar_users:
+        #             products = df[df['User_ID'] == similar_user]['Product_ID'].tolist()
+        #             recommended_products.extend(products)
+        #             if len(recommended_products) > 5:
+        #                 break
+
+        #         recommended_products = list(set(recommended_products))
+
+        #         st.success('🎯 Top Recommendations for You:')
+        #         for prod in recommended_products[:5]:
+        #             display_product(prod)
+        #     else:
+        #         st.error('⚠️ User ID not found!')
 
     elif recommender_type == 'Model-Based CF (SVD Approximation)':
         st.header('🧠 Model-Based Collaborative Filtering (SVD Approximation)')
