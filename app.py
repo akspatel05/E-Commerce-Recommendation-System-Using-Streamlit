@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
+
 # --- Streamlit Page Config ---
 st.set_page_config(page_title="Ecommerce Product Recommender", layout="wide")
 
@@ -13,8 +14,17 @@ Upload your ratings dataset and select a recommendation method from the sidebar!
 ''')
 
 # --- Sidebar ---
+
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/263/263115.png", width=120)
 st.sidebar.title('🔍 Select Recommendation Type')
+
+with st.sidebar:
+    uploaded_file = st.file_uploader("📄 Upload products.csv", type=["csv"])
+    if uploaded_file is not None:
+        products_df = pd.read_csv(uploaded_file)
+        st.success("Products loaded ✅")
+    else:
+        st.info("Please upload products.csv to proceed.")
 
 # --- Upload CSV ---
 uploaded_file = st.sidebar.file_uploader("Upload Ratings CSV", type=["csv"])
