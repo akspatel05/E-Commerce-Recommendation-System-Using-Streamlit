@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 
 # --- Streamlit Page Config ---
 st.set_page_config(page_title="Ecommerce Product Recommender", layout="wide")
@@ -101,62 +102,54 @@ if ratings_file is not None:
 
     elif recommender_type == 'User-Based CF':
         st.header('👥 User-Based Collaborative Filtering')
-
-        # user_id = st.text_input('Enter User ID for recommendations:')
-
+    
         active_users = df.groupby('User_ID').size()
         valid_user_ids = active_users[active_users > 0].index.tolist()
-        # Debugging: Display the valid_user_ids to check if it's populated
-        # st.write(f"Valid User IDs: {valid_user_ids}")  # Debugging line
-
+    
         if valid_user_ids:
-            # Allow the user to select from valid User IDs
             user_id = st.selectbox('Select User ID for recommendations:', valid_user_ids)
-
+    
             if user_id:
-                # Create the user-product matrix
-                user_product_matrix = df.pivot_table(index='User_ID', columns='Product_ID', values='Rating')
-                user_similarity = user_product_matrix.corrwith(user_product_matrix.loc[user_id]).dropna()
-                
-                # Debugging: Display similarity values for the selected user
-                st.write(f"User Similarity Values: {user_similarity.head()}")  # Debugging line
-
-                # Get similar users (sorting by similarity)
-                similar_users = user_similarity.sort_values(ascending=False).index.tolist()
-
-                # Debugging: Check the list of similar users
-                st.write(f"Similar Users: {similar_users}")  # Debugging line
-
-                # Generate recommended products based on similar users
-                recommended_products = []
-                for similar_user in similar_users:
-                    # Get products rated by similar user
-                    products = df[df['User_ID'] == similar_user]['Product_ID'].tolist()
-                    
-                    # Debugging: Check the products for each similar user
-                    st.write(f"Products for User {similar_user}: {products}")  # Debugging line
-
-                    recommended_products.extend(products)
-                    
-                    # Limit the number of recommendations to 5
-                    if len(recommended_products) > 5:
-                        break
-
-                recommended_products = list(set(recommended_products))
-
-                # Debugging: Check the final list of recommended products
-                st.write(f"Final Recommended Products: {recommended_products}")  # Debugging line
-
-                # Display recommended products
-                if recommended_products:
-                    st.success('🎯 Top Recommendations for You:')
-                    for prod in recommended_products[:5]:
-                        display_product(prod)
+                # Create the user-product matrix and fill missing ratings with 0
+                user_product_matrix = df.pivot_table(index='User_ID', columns='Product_ID', values='Rating').fillna(0)
+    
+                # Check if selected user exists
+                if user_id in user_product_matrix.index:
+                    user_vector = user_product_matrix.loc[[user_id]]  # Keep as 2D for sklearn
+    
+                    # Compute cosine similarity
+                    similarity_scores = cosine_similarity(user_vector, user_product_matrix)[0]
+    
+                    # Create a series with User IDs
+                    user_similarity = pd.Series(similarity_scores, index=user_product_matrix.index)
+    
+                    # Remove self similarity
+                    user_similarity = user_similarity.drop(user_id)
+    
+                    # Sort users by similarity
+                    similar_users = user_similarity.sort_values(ascending=False).index.tolist()
+    
+                    recommended_products = []
+    
+                    for similar_user in similar_users:
+                        products = df[df['User_ID'] == similar_user]['Product_ID'].tolist()
+                        recommended_products.extend(products)
+    
+                        if len(recommended_products) > 5:
+                            break
+    
+                    recommended_products = list(set(recommended_products))
+    
+                    if recommended_products:
+                        st.success('🎯 Top Recommendations for You:')
+                        for prod in recommended_products[:5]:
+                            display_product(prod)
+                    else:
+                        st.warning("⚠️ No recommendations found.")
                 else:
-                    st.warning("⚠️ No recommendations found.")
+                    st.error('⚠️ Selected user not found in the ratings matrix.')
         else:
             st.warning("⚠️ No valid users found with ratings. Please check your dataset.")
-
         
 
         # if user_id:
