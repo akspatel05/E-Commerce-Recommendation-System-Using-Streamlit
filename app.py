@@ -108,4 +108,4 @@ if uploaded_file is not None:
                 for prod in recommended_products:
                     st.markdown(f"⭐ **Product ID:** {prod}")
             else:
-                st.warning
+                st.warning()
