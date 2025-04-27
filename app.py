@@ -101,11 +101,15 @@ if uploaded_file is not None:
         user_id = st.text_input('Enter User ID for ML Recommendations:')
 
         if user_id:
-            recommended_products = compute_svd_recommendations(df, user_id)
-
-            if recommended_products:
-                st.success('🎯 Top Predicted Products for You:')
-                for prod in recommended_products:
-                    st.markdown(f"⭐ **Product ID:** {prod}")
-            else:
-                st.warning()
+            try:
+                recommended_products = compute_svd_recommendations(df, int(user_id))
+    
+                if recommended_products:
+                    st.success('🎯 Top Predicted Products for You:')
+                    for prod in recommended_products:
+                        st.markdown(f"⭐ **Product ID:** {prod}")
+                else:
+                    st.warning("⚠️ No recommendations found for this User ID.", icon="⚠️")
+    
+            except Exception as e:
+                st.error(f"❌ An error occurred: {e}")
