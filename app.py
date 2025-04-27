@@ -47,7 +47,7 @@ if ratings_file is not None:
     st.dataframe(df.head(10), use_container_width=True)
 
     recommender_type = st.sidebar.radio('Recommendation Method:',
-                        ['🏆 Rank-Based', '👥 User-Based CF', '🧠 Model-Based CF (SVD Approximation)'])
+                        ['Rank-Based', 'User-Based CF', 'Model-Based CF (SVD Approximation)'])
 
     # --- Helper Functions ---
     def get_top_products(df, n=10):
@@ -58,20 +58,12 @@ if ratings_file is not None:
 
     def compute_svd_recommendations(df, user_id, n_recommendations=5):
         pivot = df.pivot_table(index='User_ID', columns='Product_ID', values='Rating').fillna(0)
-        sparse_matrix = csr_matrix(pivot.values)
-        # Perform SVD using TruncatedSVD for efficiency
-        svd = TruncatedSVD(n_components=50, random_state=42)
-        svd_pred = svd.fit_transform(sparse_matrix)
+        U, sigma, Vt = np.linalg.svd(pivot.values, full_matrices=False)
 
-        svd_df = pd.DataFrame(np.dot(svd_pred, svd.components_), index=pivot.index, columns=pivot.columns)
+        sigma_diag_matrix = np.diag(sigma)
+        svd_pred = np.dot(np.dot(U, sigma_diag_matrix), Vt)
 
-        
-        # U, sigma, Vt = np.linalg.svd(pivot.values, full_matrices=False)
-
-        # sigma_diag_matrix = np.diag(sigma)
-        # svd_pred = np.dot(np.dot(U, sigma_diag_matrix), Vt)
-
-        # svd_df = pd.DataFrame(svd_pred, index=pivot.index, columns=pivot.columns)
+        svd_df = pd.DataFrame(svd_pred, index=pivot.index, columns=pivot.columns)
 
         if user_id not in svd_df.index:
             return []
