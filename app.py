@@ -47,7 +47,7 @@ if ratings_file is not None:
     st.dataframe(df.head(10), use_container_width=True)
 
     recommender_type = st.sidebar.radio('Recommendation Method:',
-                        ['Rank-Based', 'User-Based CF', 'Model-Based CF (SVD Approximation)'])
+                        ['🏆 Rank-Based', '👥 User-Based CF', '🧠 Model-Based CF (SVD Approximation)'])
 
     # --- Helper Functions ---
     def get_top_products(df, n=10):
@@ -58,12 +58,20 @@ if ratings_file is not None:
 
     def compute_svd_recommendations(df, user_id, n_recommendations=5):
         pivot = df.pivot_table(index='User_ID', columns='Product_ID', values='Rating').fillna(0)
-        U, sigma, Vt = np.linalg.svd(pivot.values, full_matrices=False)
+        sparse_matrix = csr_matrix(pivot.values)
 
-        sigma_diag_matrix = np.diag(sigma)
-        svd_pred = np.dot(np.dot(U, sigma_diag_matrix), Vt)
+        # Perform SVD using TruncatedSVD for efficiency
+        svd = TruncatedSVD(n_components=50, random_state=42)
+        svd_pred = svd.fit_transform(sparse_matrix)
 
-        svd_df = pd.DataFrame(svd_pred, index=pivot.index, columns=pivot.columns)
+        # Reconstruct the full prediction matrix
+        svd_df = pd.DataFrame(np.dot(svd_pred, svd.components_), index=pivot.index, columns=pivot.columns)
+        # U, sigma, Vt = np.linalg.svd(pivot.values, full_matrices=False)
+
+        # sigma_diag_matrix = np.diag(sigma)
+        # svd_pred = np.dot(np.dot(U, sigma_diag_matrix), Vt)
+
+        # svd_df = pd.DataFrame(svd_pred, index=pivot.index, columns=pivot.columns)
 
         if user_id not in svd_df.index:
             return []
@@ -91,7 +99,7 @@ if ratings_file is not None:
             st.markdown(f"🛒 **Unknown Product**\n\nProduct ID: {product_id}")
 
     # --- Main Recommendation Logic ---
-    if recommender_type == 'Rank-Based':
+    if recommender_type == '🏆 Rank-Based':
         st.header('🏆 Rank-Based Recommendation')
 
         top_products = get_top_products(df)
@@ -100,7 +108,7 @@ if ratings_file is not None:
         for prod_id in top_products.index:
             display_product(prod_id)
 
-    elif recommender_type == 'User-Based CF':
+    elif recommender_type == '👥 User-Based CF':
         st.header('👥 User-Based Collaborative Filtering')
     
         active_users = df.groupby('User_ID').size()
@@ -173,7 +181,7 @@ if ratings_file is not None:
         #     else:
         #         st.error('⚠️ User ID not found!')
 
-    elif recommender_type == 'Model-Based CF (SVD Approximation)':
+    elif recommender_type == '🧠 Model-Based CF (SVD Approximation)':
         st.header('🧠 Model-Based Collaborative Filtering (SVD Approximation)')
 
         user_id = st.text_input('Enter User ID for ML Recommendations:')
