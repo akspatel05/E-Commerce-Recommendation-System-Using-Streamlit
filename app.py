@@ -11,6 +11,7 @@ st.sidebar.header("Upload your CSV files")
 uploaded_products = st.sidebar.file_uploader("📦 Upload products.csv", type=["csv"])
 
 # Rename columns in case there are extra spaces or mismatches
+products_df = pd.read_csv(uploaded_products)
 products_df.columns = [col.strip() for col in products_df.columns]
 
 # Now try displaying again
