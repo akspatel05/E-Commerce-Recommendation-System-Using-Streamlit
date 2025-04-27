@@ -56,17 +56,22 @@ if ratings_file is not None:
         product_group = product_group.sort_values(by='Rating_Count', ascending=False)
         return product_group.head(n)
 
-     def compute_svd_recommendations(df, user_id, n_recommendations=5):
-        # Create sparse matrix
+    def compute_svd_recommendations(df, user_id, n_recommendations=5):
         pivot = df.pivot_table(index='User_ID', columns='Product_ID', values='Rating').fillna(0)
         sparse_matrix = csr_matrix(pivot.values)
-
         # Perform SVD using TruncatedSVD for efficiency
         svd = TruncatedSVD(n_components=50, random_state=42)
         svd_pred = svd.fit_transform(sparse_matrix)
 
-        # Reconstruct the full prediction matrix
         svd_df = pd.DataFrame(np.dot(svd_pred, svd.components_), index=pivot.index, columns=pivot.columns)
+
+        
+        # U, sigma, Vt = np.linalg.svd(pivot.values, full_matrices=False)
+
+        # sigma_diag_matrix = np.diag(sigma)
+        # svd_pred = np.dot(np.dot(U, sigma_diag_matrix), Vt)
+
+        # svd_df = pd.DataFrame(svd_pred, index=pivot.index, columns=pivot.columns)
 
         if user_id not in svd_df.index:
             return []
