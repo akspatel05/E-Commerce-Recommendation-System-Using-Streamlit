@@ -106,6 +106,12 @@ if ratings_file is not None:
 
         active_users = df.groupby('User_ID').size()
         valid_user_ids = active_users[active_users > 0].index.tolist()
+        # Debugging: Display the valid_user_ids to check if it's populated
+        st.write(f"Valid User IDs: {valid_user_ids}")  # Debugging line
+
+        if valid_user_ids:
+            # Allow the user to select from valid User IDs
+            user_id = st.selectbox('Select User ID for recommendations:', valid_user_ids)
 
         # Allow the user to select from valid User IDs
         user_id = st.selectbox('Select User ID for recommendations:', valid_user_ids)
